@@ -1,0 +1,32 @@
+{
+  "name": "time-tracker-sync",
+  "version": "1.0.0",
+  "description": "CLI tool to sync Google Calendar with Time Tracker using MCP",
+  "type": "module",
+  "main": "dist/index.js",
+  "bin": {
+    "tt-sync": "dist/index.js"
+  },
+  "scripts": {
+    "build": "tsc",
+    "watch": "tsc --watch",
+    "start": "node dist/index.js",
+    "dev": "tsc && node dist/index.js",
+    "sync": "npm run build && node dist/index.js sync"
+  },
+  "keywords": ["mcp", "time-tracker", "google-calendar", "sync"],
+  "author": "",
+  "license": "MIT",
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.0.4",
+    "commander": "^12.1.0",
+    "date-fns": "^4.1.0",
+    "dotenv": "^16.4.7",
+    "inquirer": "^12.3.0"
+  },
+  "devDependencies": {
+    "@types/inquirer": "^9.0.7",
+    "@types/node": "^22.10.2",
+    "typescript": "^5.7.2"
+  }
+}
