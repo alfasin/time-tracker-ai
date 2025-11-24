@@ -110,7 +110,7 @@ TIME_TRACKER_PASSWORD=your_password
 
 # Google Calendar IDs
 GOOGLE_CALENDAR_ID=your.email@tikalk.com
-GOOGLE_HOLIDAY_CALENDAR_ID=en.judaism#holiday@group.v.calendar.google.com
+GOOGLE_HOLIDAY_CALENDAR_ID="en.judaism#holiday@group.v.calendar.google.com"
 
 # MCP Server Paths
 TIME_TRACKER_MCP_PATH=../time-tracker-mcp/dist/index.js
