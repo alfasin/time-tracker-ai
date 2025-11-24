@@ -1,6 +1,6 @@
 # Time Tracker AI - Calendar Sync with MCP
 
-A Model Context Protocol (MCP) based solution for automatically syncing Google Calendar events with Tikal Time Tracker.
+A Model Context Protocol (MCP) based solution for automatically syncing Google Calendar events with [Tikal Time Tracker](https://github.com/tikalk/TikalTimeTracker).
 
 ## Overview
 
