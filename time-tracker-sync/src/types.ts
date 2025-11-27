@@ -61,7 +61,7 @@ export interface SyncConfig {
 export const PROJECT_TIKAL = '14';
 
 // TODO need to update
-export const PROJECT_CLIENT_ID = '';
+export const PROJECT_CLIENT_ID = '938';
 
 export const TASK_MEETING = '13';
 export const TASK_VACATION = '8';
