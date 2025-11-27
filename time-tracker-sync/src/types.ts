@@ -25,7 +25,7 @@ export interface TimeEntry {
   task: string;
   duration: string;
   note: string;
-  type: 'meeting' | 'vacation' | 'truvify';
+  type: 'meeting' | 'vacation' | 'client';
 }
 
 export interface DayCalculation {
@@ -34,7 +34,7 @@ export interface DayCalculation {
   isWFO: boolean;
   hasVacation: boolean;
   meetingHours: number;
-  truvifyHours: number;
+  clientHours: number;
   entries: TimeEntry[];
 }
 
@@ -59,7 +59,9 @@ export interface SyncConfig {
 
 // Project/Task constants
 export const PROJECT_TIKAL = '14';
-export const PROJECT_TRUVIFY = '938';
+
+// TODO need to update
+export const PROJECT_CLIENT_ID = '';
 
 export const TASK_MEETING = '13';
 export const TASK_VACATION = '8';

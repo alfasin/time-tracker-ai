@@ -1,5 +1,5 @@
 import type { CalendarEvent, DayCalculation, TimeEntry } from '../types.js';
-import { PROJECT_TIKAL, PROJECT_TRUVIFY, TASK_MEETING, TASK_VACATION, TASK_DEVELOPMENT } from '../types.js';
+import { PROJECT_TIKAL, PROJECT_CLIENT_ID, TASK_MEETING, TASK_VACATION, TASK_DEVELOPMENT } from '../types.js';
 import { HolidayDetector } from './holiday-detector.js';
 import { EventClassifier, type ClassifiedEvent } from './event-classifier.js';
 
@@ -14,6 +14,10 @@ export class DayCalculator {
     workEvents: CalendarEvent[],
     holidayEvents: CalendarEvent[]
   ): DayCalculation {
+    if (!PROJECT_CLIENT_ID) {
+      throw new Error('PROJECT_CLIENT_ID is not set');
+    }
+
     // Check if it's a holiday (skip entirely)
     const isHoliday = HolidayDetector.isVacationHoliday(date, holidayEvents);
     if (isHoliday) {
@@ -23,7 +27,7 @@ export class DayCalculator {
         isWFO: false,
         hasVacation: false,
         meetingHours: 0,
-        truvifyHours: 0,
+        clientHours: 0,
         entries: [],
       };
     }
@@ -37,7 +41,7 @@ export class DayCalculator {
         isWFO: false,
         hasVacation: false,
         meetingHours: 0,
-        truvifyHours: 0,
+        clientHours: 0,
         entries: [],
       };
     }
@@ -60,15 +64,15 @@ export class DayCalculator {
         isWFO: true,
         hasVacation: false,
         meetingHours: 0,
-        truvifyHours: WORKDAY_HOURS,
+        clientHours: WORKDAY_HOURS,
         entries: [
           {
             date,
-            project: PROJECT_TRUVIFY,
+            project: PROJECT_CLIENT_ID,
             task: TASK_DEVELOPMENT,
             duration: String(WORKDAY_HOURS),
-            note: 'Working from Truvify office',
-            type: 'truvify',
+            note: 'Working from clients office',
+            type: 'client',
           },
         ],
       };
@@ -83,7 +87,7 @@ export class DayCalculator {
         isWFO: false,
         hasVacation: true,
         meetingHours: WORKDAY_HOURS,
-        truvifyHours: 0,
+        clientHours: 0,
         entries: [
           {
             date,
@@ -97,10 +101,10 @@ export class DayCalculator {
       };
     }
 
-    // Normal workday: calculate meeting hours and remaining Truvify hours
+    // Normal workday: calculate meeting hours and remaining client hours
     const meetings = classified.filter((c) => c.type === 'meeting');
     const meetingHours = meetings.reduce((sum, m) => sum + m.duration, 0);
-    const truvifyHours = Math.max(0, WORKDAY_HOURS - meetingHours);
+    const clientHours = Math.max(0, WORKDAY_HOURS - meetingHours);
 
     const entries: TimeEntry[] = [];
 
@@ -116,15 +120,15 @@ export class DayCalculator {
       });
     }
 
-    // Add Truvify entry for remaining hours
-    if (truvifyHours > 0) {
+    // Add client entry for remaining hours
+    if (clientHours > 0) {
       entries.push({
         date,
-        project: PROJECT_TRUVIFY,
+        project: PROJECT_CLIENT_ID,
         task: TASK_DEVELOPMENT,
-        duration: String(Math.round(truvifyHours * 100) / 100),
+        duration: String(Math.round(clientHours * 100) / 100),
         note: 'Development work',
-        type: 'truvify',
+        type: 'client',
       });
     }
 
@@ -134,7 +138,7 @@ export class DayCalculator {
       isWFO: false,
       hasVacation: false,
       meetingHours,
-      truvifyHours,
+      clientHours: clientHours,
       entries,
     };
   }
@@ -148,6 +152,9 @@ export class DayCalculator {
     workEvents: CalendarEvent[],
     holidayEvents: CalendarEvent[]
   ): DayCalculation[] {
+    if (!PROJECT_CLIENT_ID) {
+      throw new Error('PROJECT_CLIENT_ID is not set');
+    }
     const calculations: DayCalculation[] = [];
     const start = new Date(startDate + 'T00:00:00');
     const end = new Date(endDate + 'T00:00:00');

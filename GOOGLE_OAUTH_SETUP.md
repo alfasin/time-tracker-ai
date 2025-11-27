@@ -29,7 +29,7 @@ The `@cocal/google-calendar-mcp` package requires OAuth 2.0 credentials to acces
    - **User support email**: Your email
    - **Developer contact**: Your email
 5. Click **Save and Continue**
-6. **Scopes**: Click **Add or Remove Scopes**
+6. **Google Auth Platform** --> **Data Access** --> **Scopes**: Click **Add or Remove Scopes**
    - Search for "calendar"
    - Select: `https://www.googleapis.com/auth/calendar.readonly`
    - Or for full access: `https://www.googleapis.com/auth/calendar`
