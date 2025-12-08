@@ -88,6 +88,25 @@ export class TimeTrackerClient {
     return response.data;
   }
 
+  async getUserReportsByMonth(yearMonth: string): Promise<any> {
+    if (!this.client) {
+      throw new Error('Client not connected');
+    }
+
+    const result = await this.client.callTool({
+      name: 'time_tracker_get_reports',
+      arguments: {
+        yearMonth,
+      },
+    });
+
+    const response = JSON.parse((result.content as any)[0].text);
+    if (!response.success) {
+      throw new Error(`Get reports failed: ${response.error}`);
+    }
+    return response.data;
+  }
+
   async getProjects(): Promise<any> {
     if (!this.client) {
       throw new Error('Client not connected');

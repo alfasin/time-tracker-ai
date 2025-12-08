@@ -96,6 +96,41 @@ program
     }
   });
 
+program
+  .command('delete')
+  .description('Delete time entries from time tracker')
+  .option('-m, --month <YYYY-MM>', 'Delete all entries for a specific month')
+  .option('-d, --date <YYYY-MM-DD>', 'Delete entries for a single date')
+  .action(async (options) => {
+    try {
+      if (!options.month && !options.date) {
+        console.error('Error: Please specify --month or --date');
+        process.exit(1);
+      }
+
+      const config = getConfig();
+      const engine = new SyncEngine(config);
+
+      await engine.initialize();
+
+      if (options.date) {
+        await engine.deleteDate(options.date);
+      } else {
+        await engine.deleteMonth(options.month);
+      }
+
+      await engine.close();
+      console.log('\n✓ Delete completed');
+      process.exit(0);
+    } catch (error: any) {
+      console.error('\n✗ Delete failed:', error.message);
+      if (error.stack) {
+        console.error(error.stack);
+      }
+      process.exit(1);
+    }
+  });
+
 // Default command
 if (process.argv.length === 2) {
   program.parse(['node', 'tt-sync', 'sync']);

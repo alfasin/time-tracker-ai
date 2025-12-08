@@ -236,6 +236,96 @@ export class SyncEngine {
     }
   }
 
+  async deleteMonth(yearMonth: string): Promise<void> {
+    const targetDate = new Date(`${yearMonth}-01`);
+    const start = startOfMonth(targetDate);
+    const end = endOfMonth(targetDate);
+
+    console.log(`\nDeleting entries for period: ${format(start, 'yyyy-MM-dd')} to ${format(end, 'yyyy-MM-dd')}`);
+
+    // Collect all entries by iterating through each day (month query API doesn't work reliably)
+    console.log('Fetching existing time entries...');
+    const allEntries: Array<{ id: string; date: string; project: string; task: string; duration: string }> = [];
+
+    for (let d = new Date(start); d <= end; d.setDate(d.getDate() + 1)) {
+      const dateStr = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+      try {
+        const response = await this.ttClient.getReports(dateStr);
+        if (response.reports && response.reports.length > 0) {
+          allEntries.push(...response.reports.map((r: any) => ({
+            id: r.id,
+            date: r.date,
+            project: r.project,
+            task: r.task,
+            duration: r.duration,
+          })));
+        }
+      } catch {
+        // Skip days with errors
+      }
+    }
+
+    if (allEntries.length === 0) {
+      console.log('No entries found for this period');
+      return;
+    }
+
+    console.log(`Found ${allEntries.length} entries to delete`);
+
+    // Delete each entry
+    let successCount = 0;
+    let errorCount = 0;
+
+    for (const entry of allEntries) {
+      try {
+        await this.ttClient.deleteTime(Number(entry.id));
+        console.log(`✓ Deleted ${entry.date}: ${entry.project}/${entry.task} (${entry.duration})`);
+        successCount++;
+      } catch (error: any) {
+        console.error(`✗ Failed to delete entry ${entry.id}: ${error.message}`);
+        errorCount++;
+      }
+    }
+
+    console.log('\n=== Delete Summary ===');
+    console.log(`✓ Deleted: ${successCount} entries`);
+    console.log(`✗ Errors: ${errorCount} entries`);
+  }
+
+  async deleteDate(date: string): Promise<void> {
+    console.log(`\nDeleting entries for date: ${date}`);
+
+    // Fetch existing time entries for the date
+    console.log('Fetching existing time entries...');
+    const reports = await this.ttClient.getReports(date);
+
+    if (!reports.reports || reports.reports.length === 0) {
+      console.log('No entries found for this date');
+      return;
+    }
+
+    console.log(`Found ${reports.reports.length} entries to delete`);
+
+    // Delete each entry
+    let successCount = 0;
+    let errorCount = 0;
+
+    for (const report of reports.reports) {
+      try {
+        await this.ttClient.deleteTime(report.id);
+        console.log(`✓ Deleted ${report.project}/${report.task} (${report.duration}h)`);
+        successCount++;
+      } catch (error: any) {
+        console.error(`✗ Failed to delete entry ${report.id}: ${error.message}`);
+        errorCount++;
+      }
+    }
+
+    console.log('\n=== Delete Summary ===');
+    console.log(`✓ Deleted: ${successCount} entries`);
+    console.log(`✗ Errors: ${errorCount} entries`);
+  }
+
   async close(): Promise<void> {
     await this.ttClient.close();
     await this.calClient.close();

@@ -12,7 +12,8 @@
     "watch": "tsc --watch",
     "start": "node dist/index.js",
     "dev": "tsc && node dist/index.js",
-    "sync": "npm run build && node dist/index.js sync"
+    "sync": "npm run build && node dist/index.js sync",
+    "delete": "npm run build && node dist/index.js delete"
   },
   "keywords": ["mcp", "time-tracker", "google-calendar", "sync"],
   "author": "",
