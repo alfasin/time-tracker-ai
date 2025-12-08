@@ -160,7 +160,8 @@ export class DayCalculator {
     const end = new Date(endDate + 'T00:00:00');
 
     for (let d = new Date(start); d <= end; d.setDate(d.getDate() + 1)) {
-      const dateStr = d.toISOString().split('T')[0];
+      // Format date in local timezone (not UTC) to avoid off-by-one errors
+      const dateStr = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
       calculations.push(this.calculateDay(dateStr, workEvents, holidayEvents));
     }
 

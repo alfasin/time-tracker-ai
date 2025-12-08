@@ -40,12 +40,15 @@ export class SyncEngine {
   }
 
   async syncMonth(yearMonth?: string): Promise<void> {
+    const today = new Date();
     const targetDate = yearMonth
       ? new Date(`${yearMonth}-01`)
-      : new Date();
+      : today;
 
     const startDate = format(startOfMonth(targetDate), 'yyyy-MM-dd');
-    const endDate = format(endOfMonth(targetDate), 'yyyy-MM-dd');
+    // Cap end date to today if syncing current month (don't process future dates)
+    const monthEnd = endOfMonth(targetDate);
+    const endDate = format(monthEnd > today ? today : monthEnd, 'yyyy-MM-dd');
 
     console.log(`\nSyncing period: ${startDate} to ${endDate}`);
 
