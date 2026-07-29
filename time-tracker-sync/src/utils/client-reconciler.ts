@@ -5,6 +5,7 @@ import {
   saveClientsConfig,
   findNewProjectIds,
   buildSingleClientConfig,
+  activeProjectIds,
   type ClientsConfig,
 } from './client-config.js';
 import { runClientWizard } from './client-wizard.js';
@@ -22,6 +23,16 @@ export async function ensureClientsConfig(
   }
 
   const existing = loadClientsConfig(configPath);
+
+  if (existing) {
+    const liveProjectIds = new Set(projects.map((p) => p.id));
+    const missing = activeProjectIds(existing).filter((id) => !liveProjectIds.has(id));
+    if (missing.length > 0) {
+      throw new Error(
+        `Client project(s) ${missing.join(', ')} are configured in ${configPath} but no longer exist in Time Tracker. Fix or delete the file and re-run.`
+      );
+    }
+  }
 
   if (!existing && projects.length === 1) {
     const config = buildSingleClientConfig(projects[0].id, projects[0].name);

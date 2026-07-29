@@ -41,7 +41,9 @@ export class SyncEngine {
       this.config.timeTrackerPassword
     );
     console.log('✓ Authenticated with Time Tracker');
+  }
 
+  private async ensureClientsConfigLoaded(): Promise<void> {
     // Discover client projects and resolve billing configuration
     console.log('Checking client configuration...');
     const projects = await this.ttClient.getProjects();
@@ -53,6 +55,8 @@ export class SyncEngine {
   }
 
   async syncMonth(yearMonth?: string): Promise<void> {
+    await this.ensureClientsConfigLoaded();
+
     const today = new Date();
     const targetDate = yearMonth
       ? new Date(`${yearMonth}-01`)
@@ -172,6 +176,8 @@ export class SyncEngine {
   }
 
   async syncDate(date: string): Promise<void> {
+    await this.ensureClientsConfigLoaded();
+
     console.log(`\nSyncing single date: ${date}`);
 
     // Fetch calendar events for the specific date

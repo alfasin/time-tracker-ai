@@ -1,5 +1,5 @@
 import { describe, it, expect, afterEach } from 'vitest';
-import { mkdtempSync, rmSync } from 'node:fs';
+import { mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import {
@@ -9,6 +9,7 @@ import {
   percentsSumTo100,
   loadClientsConfig,
   saveClientsConfig,
+  activeProjectIds,
   type ClientsConfig,
 } from './client-config.js';
 
@@ -113,5 +114,74 @@ describe('loadClientsConfig / saveClientsConfig', () => {
     saveClientsConfig(path, config);
 
     expect(loadClientsConfig(path)).toEqual(config);
+  });
+
+  it('throws an error naming the file path when the JSON is malformed', () => {
+    dir = mkdtempSync(join(tmpdir(), 'tt-sync-test-'));
+    const path = join(dir, 'clients.config.json');
+    writeFileSync(path, '{ this is not valid json', 'utf-8');
+
+    expect(() => loadClientsConfig(path)).toThrow(path);
+  });
+
+  it('throws when mode is "switch" but switch is null', () => {
+    dir = mkdtempSync(join(tmpdir(), 'tt-sync-test-'));
+    const path = join(dir, 'clients.config.json');
+    writeFileSync(
+      path,
+      JSON.stringify({
+        mode: 'switch',
+        knownProjectIds: ['938', '952'],
+        projectNames: { '938': 'Truvify', '952': 'Acme Corp' },
+        split: null,
+        switch: null,
+      }),
+      'utf-8'
+    );
+
+    expect(() => loadClientsConfig(path)).toThrow(/Invalid clients config/);
+  });
+
+  it('throws when projectNames is missing', () => {
+    dir = mkdtempSync(join(tmpdir(), 'tt-sync-test-'));
+    const path = join(dir, 'clients.config.json');
+    writeFileSync(
+      path,
+      JSON.stringify({
+        mode: 'split',
+        knownProjectIds: ['938'],
+        split: { '938': 100 },
+        switch: null,
+      }),
+      'utf-8'
+    );
+
+    expect(() => loadClientsConfig(path)).toThrow(/Invalid clients config/);
+  });
+});
+
+describe('activeProjectIds', () => {
+  it('returns only nonzero-percent project ids in split mode', () => {
+    const config: ClientsConfig = {
+      mode: 'split',
+      knownProjectIds: ['938', '952', '101'],
+      projectNames: { '938': 'Truvify', '952': 'Acme Corp', '101': 'Dormant Client' },
+      split: { '938': 60, '952': 40, '101': 0 },
+      switch: null,
+    };
+
+    expect(activeProjectIds(config)).toEqual(['938', '952']);
+  });
+
+  it('returns both before and after ids in switch mode regardless of date', () => {
+    const config: ClientsConfig = {
+      mode: 'switch',
+      knownProjectIds: ['938', '952'],
+      projectNames: { '938': 'Truvify', '952': 'Acme Corp' },
+      split: null,
+      switch: { beforeProjectId: '938', afterProjectId: '952', lastDateWithBefore: '2026-06-30' },
+    };
+
+    expect(activeProjectIds(config)).toEqual(['938', '952']);
   });
 });

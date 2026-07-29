@@ -120,4 +120,52 @@ describe('ensureClientsConfig', () => {
     expect(config).toEqual(wizardResult);
     expect(runClientWizard).toHaveBeenCalledWith(existing, projects);
   });
+
+  it('throws when a split-mode config references a project no longer in the live list', async () => {
+    const existing: ClientsConfig = {
+      mode: 'split',
+      knownProjectIds: ['938', '952'],
+      projectNames: { '938': 'Truvify', '952': 'Acme Corp' },
+      split: { '938': 60, '952': 40 },
+      switch: null,
+    };
+    saveClientsConfig(configPath, existing);
+
+    const projects: Project[] = [{ id: '938', name: 'Truvify', tasks: [] }];
+
+    await expect(ensureClientsConfig(configPath, projects)).rejects.toThrow(/952/);
+    expect(runClientWizard).not.toHaveBeenCalled();
+  });
+
+  it('throws when a switch-mode config\'s beforeProjectId is missing from the live list', async () => {
+    const existing: ClientsConfig = {
+      mode: 'switch',
+      knownProjectIds: ['938', '952'],
+      projectNames: { '938': 'Truvify', '952': 'Acme Corp' },
+      split: null,
+      switch: { beforeProjectId: '938', afterProjectId: '952', lastDateWithBefore: '2026-06-30' },
+    };
+    saveClientsConfig(configPath, existing);
+
+    const projects: Project[] = [{ id: '952', name: 'Acme Corp', tasks: [] }];
+
+    await expect(ensureClientsConfig(configPath, projects)).rejects.toThrow(/938/);
+    expect(runClientWizard).not.toHaveBeenCalled();
+  });
+
+  it('throws when a switch-mode config\'s afterProjectId is missing from the live list', async () => {
+    const existing: ClientsConfig = {
+      mode: 'switch',
+      knownProjectIds: ['938', '952'],
+      projectNames: { '938': 'Truvify', '952': 'Acme Corp' },
+      split: null,
+      switch: { beforeProjectId: '938', afterProjectId: '952', lastDateWithBefore: '2026-06-30' },
+    };
+    saveClientsConfig(configPath, existing);
+
+    const projects: Project[] = [{ id: '938', name: 'Truvify', tasks: [] }];
+
+    await expect(ensureClientsConfig(configPath, projects)).rejects.toThrow(/952/);
+    expect(runClientWizard).not.toHaveBeenCalled();
+  });
 });
