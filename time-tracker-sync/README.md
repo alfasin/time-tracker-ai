@@ -27,7 +27,8 @@ This project uses an MCP-based architecture:
 - Automatically syncs calendar events to time tracker
 - Classifies events as meetings, vacation, or WFO (Working From Office)
 - Handles Israeli holidays (only actual vacation days)
-- Fills remaining hours with Truvify work (9 hours/day for Sun-Thu)
+- Fills remaining hours with client work (9 hours/day for Sun-Thu)
+- Automatically discovers client projects from Time Tracker and, once 2+ are active, asks whether to split hours by a fixed percentage or switch entirely on a given date
 - Detects conflicts with existing time entries
 - Prompts user before overwriting entries
 
@@ -122,13 +123,13 @@ node dist/index.js test-connection
 For each workday (Sunday-Thursday):
 
 1. **Check if holiday** → Skip entirely (no submissions)
-2. **Check if has "WFO" event** → Submit 9 hours Truvify only
+2. **Check if has "WFO" event** → Submit 9 hours of client work only
 3. **Check if has "vacation"/"PTO" event** → Submit 9 hours vacation
 4. **Normal day**:
    - Sum all meeting durations
    - Submit as "Tikal - Meeting" (project=14, task=13)
    - Calculate remaining hours: 9 - meetings
-   - Submit remaining as Truvify (project=938, task=5)
+   - Submit remaining as client work (task=5), billed to one or more client projects per `clients.config.json` — see [Client Billing Configuration](#client-billing-configuration)
 
 ### Holiday Detection
 
@@ -146,6 +147,19 @@ All other holidays marked in the calendar are treated as regular working days.
 - **WFO Events**: Title contains "WFO" or "working from office"
 - **Vacation**: Title contains "vacation", "PTO", or "paid time off"
 - **Meetings**: All other calendar events
+
+### Client Billing Configuration
+
+Client project IDs are no longer hardcoded — the tool discovers them from Time Tracker on every `sync` run and stores your billing preference in `clients.config.json` (gitignored, project-root of `time-tracker-sync/`):
+
+- **One client project** → billing is automatic, no prompts. `clients.config.json` is created silently the first time.
+- **Two or more client projects seen for the first time** (or a new one appears later) → you're asked, once, to choose:
+  - **Split**: a fixed percentage of each day's client hours goes to each project (e.g. 60% / 40%), every day.
+  - **Switch**: pick which client you worked with before a given date and which one after — hours bill 100% to one side or the other depending on the entry's date.
+- **No change since last run** → the saved config is reused silently, no prompts, no file rewrites.
+- If a project you'd configured is later removed from Time Tracker, or the config file is corrupted, `sync` stops with a clear error telling you to fix or delete `clients.config.json` rather than silently mis-billing hours.
+
+This reconciliation only runs for `sync` (not `test-connection` or `delete`), since only `sync` needs to know how to bill client hours.
 
 ### Conflict Resolution
 
@@ -171,8 +185,12 @@ time-tracker-sync/
 │       ├── day-calculator.ts         # Daily time calculation logic
 │       ├── event-classifier.ts       # Event type classification
 │       ├── holiday-detector.ts       # Holiday detection
-│       └── conflict-handler.ts       # Conflict resolution
+│       ├── conflict-handler.ts       # Conflict resolution
+│       ├── client-config.ts          # Client billing data model + resolution logic
+│       ├── client-wizard.ts          # Interactive split/switch prompts
+│       └── client-reconciler.ts      # Reconciles clients.config.json against live Time Tracker projects
 ├── .env                              # Environment configuration
+├── clients.config.json               # Client billing config (auto-generated, gitignored)
 ├── package.json
 ├── tsconfig.json
 └── README.md
@@ -192,6 +210,12 @@ npm run build
 npm run watch
 ```
 
+### Testing
+
+```bash
+npm test
+```
+
 ### Development Mode
 
 ```bash
@@ -202,7 +226,7 @@ npm run dev
 
 - **Tikal Meeting**: project=14, task=13
 - **Tikal Vacation**: project=14, task=8
-- **Truvify Development**: project=938, task=5
+- **Client Development**: task=5, project=whichever client project(s) `clients.config.json` resolves for that date (see [Client Billing Configuration](#client-billing-configuration))
 
 ## Troubleshooting
 
@@ -219,6 +243,10 @@ Check your TIME_TRACKER_EMAIL and TIME_TRACKER_PASSWORD in .env.
 1. Verify GOOGLE_CALENDAR_ID is correct
 2. Ensure Google Calendar MCP has OAuth access
 3. Check the date range being queried
+
+### "Invalid clients config" / a client project disappeared
+
+`sync` validates `clients.config.json` and the live Time Tracker project list on every run. If it errors out here, fix or delete `clients.config.json` and run `sync` again — it will either reuse a corrected file or walk you through the split/switch prompts again.
 
 ### MCP Connection Issues
 
