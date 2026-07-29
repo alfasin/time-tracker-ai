@@ -18,6 +18,9 @@ build/
 gcp-oauth.keys.json
 .gcp-saved-tokens.json
 
+# Client billing configuration (user-specific, not committed)
+time-tracker-sync/clients.config.json
+
 # IDE
 .vscode/
 .idea/

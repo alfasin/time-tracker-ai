@@ -47,6 +47,17 @@ export interface ExistingReport {
   note: string;
 }
 
+export interface Task {
+  id: string;
+  name: string;
+}
+
+export interface Project {
+  id: string;
+  name: string;
+  tasks: Task[];
+}
+
 export interface SyncConfig {
   timeTrackerEmail: string;
   timeTrackerPassword: string;
@@ -59,9 +70,6 @@ export interface SyncConfig {
 
 // Project/Task constants
 export const PROJECT_TIKAL = '14';
-
-// TODO need to update
-export const PROJECT_CLIENT_ID = '938';
 
 export const TASK_MEETING = '13';
 export const TASK_VACATION = '8';

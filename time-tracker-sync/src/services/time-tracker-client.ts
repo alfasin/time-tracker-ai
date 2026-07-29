@@ -1,6 +1,6 @@
 import { Client } from '@modelcontextprotocol/sdk/client/index.js';
 import { StdioClientTransport } from '@modelcontextprotocol/sdk/client/stdio.js';
-import type { TimeEntry } from '../types.js';
+import type { TimeEntry, Project } from '../types.js';
 
 export class TimeTrackerClient {
   private client: Client | null = null;
@@ -107,7 +107,7 @@ export class TimeTrackerClient {
     return response.data;
   }
 
-  async getProjects(): Promise<any> {
+  async getProjects(): Promise<Project[]> {
     if (!this.client) {
       throw new Error('Client not connected');
     }
@@ -121,7 +121,7 @@ export class TimeTrackerClient {
     if (!response.success) {
       throw new Error(`Get projects failed: ${response.error}`);
     }
-    return response.data;
+    return response.data as Project[];
   }
 
   async deleteTime(id: number): Promise<any> {
