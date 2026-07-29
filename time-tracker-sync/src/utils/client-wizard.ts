@@ -38,14 +38,21 @@ export async function runClientWizard(
       },
     ]);
 
-    const { afterProjectId } = await inquirer.prompt([
-      {
-        type: 'list',
-        name: 'afterProjectId',
-        message: 'Which client are you working with AFTER the switch?',
-        choices: list.filter((p) => p.id !== beforeProjectId).map((p) => ({ name: p.name, value: p.id })),
-      },
-    ]);
+    const afterChoices = list.filter((p) => p.id !== beforeProjectId);
+    let afterProjectId: string;
+    if (afterChoices.length === 1) {
+      afterProjectId = afterChoices[0].id;
+      console.log(`Client after the switch: ${afterChoices[0].name}`);
+    } else {
+      ({ afterProjectId } = await inquirer.prompt([
+        {
+          type: 'list',
+          name: 'afterProjectId',
+          message: 'Which client are you working with AFTER the switch?',
+          choices: afterChoices.map((p) => ({ name: p.name, value: p.id })),
+        },
+      ]));
+    }
 
     const { lastDateWithBefore } = await inquirer.prompt([
       {

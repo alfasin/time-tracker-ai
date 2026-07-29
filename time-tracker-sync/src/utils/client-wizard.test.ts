@@ -48,11 +48,10 @@ describe('runClientWizard', () => {
     expect(inquirer.prompt).toHaveBeenCalledTimes(5);
   });
 
-  it('builds a switch config from before/after/date answers', async () => {
+  it('builds a switch config, auto-selecting the after-client when only one remains', async () => {
     vi.mocked(inquirer.prompt)
       .mockResolvedValueOnce({ mode: 'switch' })
       .mockResolvedValueOnce({ beforeProjectId: '938' })
-      .mockResolvedValueOnce({ afterProjectId: '952' })
       .mockResolvedValueOnce({ lastDateWithBefore: '2026-06-30' });
 
     const config = await runClientWizard(null, projects);
@@ -64,5 +63,25 @@ describe('runClientWizard', () => {
       split: null,
       switch: { beforeProjectId: '938', afterProjectId: '952', lastDateWithBefore: '2026-06-30' },
     });
+    expect(inquirer.prompt).toHaveBeenCalledTimes(3);
+  });
+
+  it('still asks for the after-client when 3+ clients are known', async () => {
+    const threeProjects: Project[] = [...projects, { id: '101', name: 'Beta Inc', tasks: [] }];
+
+    vi.mocked(inquirer.prompt)
+      .mockResolvedValueOnce({ mode: 'switch' })
+      .mockResolvedValueOnce({ beforeProjectId: '938' })
+      .mockResolvedValueOnce({ afterProjectId: '101' })
+      .mockResolvedValueOnce({ lastDateWithBefore: '2026-06-30' });
+
+    const config = await runClientWizard(null, threeProjects);
+
+    expect(config.switch).toEqual({
+      beforeProjectId: '938',
+      afterProjectId: '101',
+      lastDateWithBefore: '2026-06-30',
+    });
+    expect(inquirer.prompt).toHaveBeenCalledTimes(4);
   });
 });
