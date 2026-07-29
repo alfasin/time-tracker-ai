@@ -1,23 +1,41 @@
 import type { CalendarEvent, DayCalculation, TimeEntry } from '../types.js';
-import { PROJECT_TIKAL, PROJECT_CLIENT_ID, TASK_MEETING, TASK_VACATION, TASK_DEVELOPMENT } from '../types.js';
+import { PROJECT_TIKAL, TASK_MEETING, TASK_VACATION, TASK_DEVELOPMENT } from '../types.js';
 import { HolidayDetector } from './holiday-detector.js';
 import { EventClassifier, type ClassifiedEvent } from './event-classifier.js';
+import { resolveClientsForDate, type ClientsConfig } from './client-config.js';
 
 const WORKDAY_HOURS = 9;
 
 export class DayCalculator {
+  private static buildClientEntries(
+    date: string,
+    totalHours: number,
+    clientsConfig: ClientsConfig,
+    baseNote: string
+  ): TimeEntry[] {
+    const allocations = resolveClientsForDate(clientsConfig, date);
+    return allocations.map(({ projectId, percent }) => ({
+      date,
+      project: projectId,
+      task: TASK_DEVELOPMENT,
+      duration: String(Math.round(((totalHours * percent) / 100) * 100) / 100),
+      note:
+        allocations.length > 1
+          ? `${baseNote} (${clientsConfig.projectNames[projectId] ?? projectId} - ${percent}%)`
+          : baseNote,
+      type: 'client',
+    }));
+  }
+
   /**
    * Calculate what time entries should be submitted for a given day
    */
   static calculateDay(
     date: string,
     workEvents: CalendarEvent[],
-    holidayEvents: CalendarEvent[]
+    holidayEvents: CalendarEvent[],
+    clientsConfig: ClientsConfig
   ): DayCalculation {
-    if (!PROJECT_CLIENT_ID) {
-      throw new Error('PROJECT_CLIENT_ID is not set');
-    }
-
     // Check if it's a holiday (skip entirely)
     const isHoliday = HolidayDetector.isVacationHoliday(date, holidayEvents);
     if (isHoliday) {
@@ -65,16 +83,7 @@ export class DayCalculator {
         hasVacation: false,
         meetingHours: 0,
         clientHours: WORKDAY_HOURS,
-        entries: [
-          {
-            date,
-            project: PROJECT_CLIENT_ID,
-            task: TASK_DEVELOPMENT,
-            duration: String(WORKDAY_HOURS),
-            note: 'Working from clients office',
-            type: 'client',
-          },
-        ],
+        entries: this.buildClientEntries(date, WORKDAY_HOURS, clientsConfig, 'Working from clients office'),
       };
     }
 
@@ -120,16 +129,9 @@ export class DayCalculator {
       });
     }
 
-    // Add client entry for remaining hours
+    // Add client entries for remaining hours, split across configured clients
     if (clientHours > 0) {
-      entries.push({
-        date,
-        project: PROJECT_CLIENT_ID,
-        task: TASK_DEVELOPMENT,
-        duration: String(Math.round(clientHours * 100) / 100),
-        note: 'Development work',
-        type: 'client',
-      });
+      entries.push(...this.buildClientEntries(date, clientHours, clientsConfig, 'Development work'));
     }
 
     return {
@@ -150,11 +152,9 @@ export class DayCalculator {
     startDate: string,
     endDate: string,
     workEvents: CalendarEvent[],
-    holidayEvents: CalendarEvent[]
+    holidayEvents: CalendarEvent[],
+    clientsConfig: ClientsConfig
   ): DayCalculation[] {
-    if (!PROJECT_CLIENT_ID) {
-      throw new Error('PROJECT_CLIENT_ID is not set');
-    }
     const calculations: DayCalculation[] = [];
     const start = new Date(startDate + 'T00:00:00');
     const end = new Date(endDate + 'T00:00:00');
@@ -162,7 +162,7 @@ export class DayCalculator {
     for (let d = new Date(start); d <= end; d.setDate(d.getDate() + 1)) {
       // Format date in local timezone (not UTC) to avoid off-by-one errors
       const dateStr = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
-      calculations.push(this.calculateDay(dateStr, workEvents, holidayEvents));
+      calculations.push(this.calculateDay(dateStr, workEvents, holidayEvents, clientsConfig));
     }
 
     return calculations;

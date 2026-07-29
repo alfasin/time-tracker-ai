@@ -1,14 +1,18 @@
 import { startOfMonth, endOfMonth, format } from 'date-fns';
+import { resolve } from 'node:path';
 import { TimeTrackerClient } from './services/time-tracker-client.js';
 import { CalendarClient } from './services/calendar-client.js';
 import { DayCalculator } from './utils/day-calculator.js';
 import { ConflictHandler } from './utils/conflict-handler.js';
+import { ensureClientsConfig } from './utils/client-reconciler.js';
+import type { ClientsConfig } from './utils/client-config.js';
 import type { SyncConfig, ExistingReport } from './types.js';
 
 export class SyncEngine {
   private ttClient: TimeTrackerClient;
   private calClient: CalendarClient;
   private config: SyncConfig;
+  private clientsConfig!: ClientsConfig;
 
   constructor(config: SyncConfig) {
     this.config = config;
@@ -37,6 +41,15 @@ export class SyncEngine {
       this.config.timeTrackerPassword
     );
     console.log('✓ Authenticated with Time Tracker');
+
+    // Discover client projects and resolve billing configuration
+    console.log('Checking client configuration...');
+    const projects = await this.ttClient.getProjects();
+    this.clientsConfig = await ensureClientsConfig(
+      resolve(process.cwd(), 'clients.config.json'),
+      projects
+    );
+    console.log(`✓ Client billing mode: ${this.clientsConfig.mode}`);
   }
 
   async syncMonth(yearMonth?: string): Promise<void> {
@@ -74,7 +87,8 @@ export class SyncEngine {
       startDate,
       endDate,
       workEvents,
-      holidayEvents
+      holidayEvents,
+      this.clientsConfig
     );
 
     // Filter to only workdays with entries
@@ -174,7 +188,7 @@ export class SyncEngine {
     );
 
     // Calculate time entries
-    const calculation = DayCalculator.calculateDay(date, workEvents, holidayEvents);
+    const calculation = DayCalculator.calculateDay(date, workEvents, holidayEvents, this.clientsConfig);
 
     if (calculation.entries.length === 0) {
       console.log('No time entries needed for this date');

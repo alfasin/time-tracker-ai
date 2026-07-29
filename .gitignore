@@ -14,6 +14,9 @@ build/
 .env.local
 .env.*.local
 
+# Client billing configuration (user-specific, not committed)
+time-tracker-sync/clients.config.json
+
 # IDE
 .vscode/
 .idea/
