@@ -47,6 +47,17 @@ export interface ExistingReport {
   note: string;
 }
 
+export interface Task {
+  id: string;
+  name: string;
+}
+
+export interface Project {
+  id: string;
+  name: string;
+  tasks: Task[];
+}
+
 export interface SyncConfig {
   timeTrackerEmail: string;
   timeTrackerPassword: string;
