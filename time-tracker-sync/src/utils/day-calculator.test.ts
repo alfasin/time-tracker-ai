@@ -88,3 +88,46 @@ describe('DayCalculator.calculateRange', () => {
     }
   });
 });
+
+describe('DayCalculator.calculateDay with a multi-day vacation event', () => {
+  // Mirrors a real Google Calendar event: a single object spanning several days
+  // (start/end dateTime), not one event per day.
+  const multiDayVacation: CalendarEvent = {
+    id: 'v1',
+    summary: 'Nir - Vacation',
+    start: { dateTime: '2026-08-05T00:00:00+03:00' },
+    end: { dateTime: '2026-08-23T00:00:00+03:00' },
+  };
+
+  const singleConfig = buildSingleClientConfig('938', 'Truvify');
+
+  it('marks the first day of the range as vacation', () => {
+    const result = DayCalculator.calculateDay('2026-08-05', [multiDayVacation], [], singleConfig);
+    expect(result.hasVacation).toBe(true);
+  });
+
+  it('marks a day in the middle of the range as vacation, not a normal workday', () => {
+    const result = DayCalculator.calculateDay('2026-08-12', [multiDayVacation], [], singleConfig);
+    expect(result.hasVacation).toBe(true);
+    expect(result.entries).toEqual([
+      { date: '2026-08-12', project: '14', task: '8', duration: '9', note: 'Vacation/PTO', type: 'vacation' },
+    ]);
+  });
+
+  it('marks the last workday before the (exclusive) end date as vacation', () => {
+    // 2026-08-22 is the actual last day covered by the event, but it's a Saturday
+    // (weekend), so 08-20 (Thursday) is the last workday that should show vacation.
+    const result = DayCalculator.calculateDay('2026-08-20', [multiDayVacation], [], singleConfig);
+    expect(result.hasVacation).toBe(true);
+  });
+
+  it('does not mark the exclusive end date itself as vacation', () => {
+    const result = DayCalculator.calculateDay('2026-08-23', [multiDayVacation], [], singleConfig);
+    expect(result.hasVacation).toBe(false);
+  });
+
+  it('does not mark a day before the range as vacation', () => {
+    const result = DayCalculator.calculateDay('2026-08-04', [multiDayVacation], [], singleConfig);
+    expect(result.hasVacation).toBe(false);
+  });
+});

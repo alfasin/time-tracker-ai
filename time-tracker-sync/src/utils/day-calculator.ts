@@ -64,17 +64,13 @@ export class DayCalculator {
       };
     }
 
-    // Filter events for this specific date
-    const eventsOnDate = workEvents.filter((event) => {
-      const eventDate = event.start.date || event.start.dateTime?.split('T')[0];
-      return eventDate === date;
-    });
-
-    // Classify events
-    const classified = EventClassifier.classifyEvents(eventsOnDate);
-
-    // Check for WFO event
-    const hasWFO = classified.some((c) => c.type === 'wfo');
+    // Check for WFO/vacation events overlapping this date. These are checked against
+    // the full event list (not just eventsOnDate below) because a single vacation or
+    // WFO event commonly spans multiple days as one object (e.g. start=Aug 5, end=Aug 23
+    // exclusive) rather than being expanded into one event per day.
+    const hasWFO = workEvents.some(
+      (event) => EventClassifier.isWFOEvent(event) && HolidayDetector.eventOverlapsDate(event, date)
+    );
     if (hasWFO) {
       return {
         date,
@@ -88,7 +84,9 @@ export class DayCalculator {
     }
 
     // Check for vacation event
-    const hasVacation = classified.some((c) => c.type === 'vacation');
+    const hasVacation = workEvents.some(
+      (event) => EventClassifier.isVacationEvent(event) && HolidayDetector.eventOverlapsDate(event, date)
+    );
     if (hasVacation) {
       return {
         date,
@@ -110,7 +108,14 @@ export class DayCalculator {
       };
     }
 
-    // Normal workday: calculate meeting hours and remaining client hours
+    // Normal workday: calculate meeting hours and remaining client hours.
+    // Meetings are matched by exact start date (not overlap) since a single
+    // meeting occurrence isn't expected to span multiple calendar days.
+    const eventsOnDate = workEvents.filter((event) => {
+      const eventDate = event.start.date || event.start.dateTime?.split('T')[0];
+      return eventDate === date;
+    });
+    const classified = EventClassifier.classifyEvents(eventsOnDate);
     const meetings = classified.filter((c) => c.type === 'meeting');
     const meetingHours = meetings.reduce((sum, m) => sum + m.duration, 0);
     const clientHours = Math.max(0, WORKDAY_HOURS - meetingHours);

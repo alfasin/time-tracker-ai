@@ -19,11 +19,9 @@ export class HolidayDetector {
    * Check if a given date is a vacation holiday based on the Jewish calendar
    */
   static isVacationHoliday(date: string, holidayEvents: CalendarEvent[]): boolean {
-    // Find events on the given date
-    const eventsOnDate = holidayEvents.filter((event) => {
-      const eventDate = event.start.date || event.start.dateTime?.split('T')[0];
-      return eventDate === date;
-    });
+    // Find events overlapping the given date (events may span multiple days
+    // as a single object, e.g. start=Sukkot eve, end=last day exclusive)
+    const eventsOnDate = holidayEvents.filter((event) => this.eventOverlapsDate(event, date));
 
     // Check if any of the events match vacation holiday names
     return eventsOnDate.some((event) => {
@@ -32,6 +30,26 @@ export class HolidayDetector {
         summary.includes(holiday.toLowerCase())
       );
     });
+  }
+
+  /**
+   * Check if an event overlaps a given date, handling events that span
+   * multiple days as a single object (end date/dateTime is exclusive).
+   */
+  static eventOverlapsDate(event: CalendarEvent, date: string): boolean {
+    const dayStart = new Date(`${date}T00:00:00`);
+    const dayEnd = new Date(`${date}T23:59:59.999`);
+
+    const startRaw = event.start.dateTime || event.start.date;
+    const endRaw = event.end.dateTime || event.end.date;
+    if (!startRaw || !endRaw) {
+      return false;
+    }
+
+    const eventStart = event.start.dateTime ? new Date(startRaw) : new Date(`${startRaw}T00:00:00`);
+    const eventEnd = event.end.dateTime ? new Date(endRaw) : new Date(`${endRaw}T00:00:00`);
+
+    return eventStart < dayEnd && eventEnd > dayStart;
   }
 
   /**
