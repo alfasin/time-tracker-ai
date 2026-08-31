@@ -29,8 +29,7 @@ This project uses an MCP-based architecture:
 - Handles Israeli holidays (only actual vacation days)
 - Fills remaining hours with client work (9 hours/day for Sun-Thu)
 - Automatically discovers client projects from Time Tracker and, once 2+ are active, asks whether to split hours by a fixed percentage or switch entirely on a given date
-- Detects conflicts with existing time entries
-- Prompts user before overwriting entries
+- Idempotent per-day sync: every day in range has its existing entries deleted and replaced with freshly calculated ones, so re-running a sync always converges to the same result with no manual conflict resolution
 
 ## Prerequisites
 
@@ -161,14 +160,14 @@ Client project IDs are no longer hardcoded — the tool discovers them from Time
 
 This reconciliation only runs for `sync` (not `test-connection` or `delete`), since only `sync` needs to know how to bill client hours.
 
-### Conflict Resolution
+### Idempotent Sync
 
-When existing time entries are found:
-1. Tool displays existing vs. new entries
-2. User chooses:
-   - **Skip**: Keep existing, don't add new
-   - **Replace**: Delete existing, add new
-   - **Add**: Keep existing, add new anyway
+Every day processed by `sync` (the whole range for `--month`, or the single day for `--date`) goes through the same delete-then-add step:
+1. Fetch any existing time entries for that date
+2. Delete all of them
+3. Add whatever the calculator produced for that date (possibly nothing, e.g. weekends/holidays)
+
+There's no conflict prompt — running `sync` again for the same period always leaves Time Tracker matching exactly what the calculator computes from your calendar, even if a day's classification changed since the last run (e.g. a meeting was added/removed, or a vacation event was extended).
 
 ## Project Structure
 
@@ -185,7 +184,7 @@ time-tracker-sync/
 │       ├── day-calculator.ts         # Daily time calculation logic
 │       ├── event-classifier.ts       # Event type classification
 │       ├── holiday-detector.ts       # Holiday detection
-│       ├── conflict-handler.ts       # Conflict resolution
+│       ├── sync-plan.ts              # Idempotent delete-then-add day sync plan
 │       ├── client-config.ts          # Client billing data model + resolution logic
 │       ├── client-wizard.ts          # Interactive split/switch prompts
 │       └── client-reconciler.ts      # Reconciles clients.config.json against live Time Tracker projects

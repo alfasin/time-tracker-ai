@@ -3,10 +3,16 @@ import { resolve } from 'node:path';
 import { TimeTrackerClient } from './services/time-tracker-client.js';
 import { CalendarClient } from './services/calendar-client.js';
 import { DayCalculator } from './utils/day-calculator.js';
-import { ConflictHandler } from './utils/conflict-handler.js';
+import { planDaySync } from './utils/sync-plan.js';
 import { ensureClientsConfig } from './utils/client-reconciler.js';
 import type { ClientsConfig } from './utils/client-config.js';
-import type { SyncConfig, ExistingReport } from './types.js';
+import type { SyncConfig, ExistingReport, DayCalculation } from './types.js';
+
+interface DaySyncCounts {
+  deleted: number;
+  added: number;
+  errors: number;
+}
 
 export class SyncEngine {
   private ttClient: TimeTrackerClient;
@@ -41,6 +47,61 @@ export class SyncEngine {
       this.config.timeTrackerPassword
     );
     console.log('✓ Authenticated with Time Tracker');
+  }
+
+  /**
+   * Idempotent per-day sync: delete every existing entry for the date, then
+   * add whatever the calculator produced (which may be nothing). Re-running
+   * a sync always converges to exactly what's calculated, so there's no
+   * conflict to resolve.
+   */
+  private async syncDay(calc: DayCalculation): Promise<DaySyncCounts> {
+    const counts: DaySyncCounts = { deleted: 0, added: 0, errors: 0 };
+
+    let existingReports: ExistingReport[] = [];
+    try {
+      const reports = await this.ttClient.getReports(calc.date);
+      existingReports = (reports.reports || []).map((r: any) => ({
+        id: r.id,
+        project: r.project,
+        task: r.task,
+        date: calc.date,
+        duration: parseFloat(r.duration),
+        note: r.note,
+      }));
+    } catch (error) {
+      console.error(`Warning: Could not fetch reports for ${calc.date}`);
+    }
+
+    const plan = planDaySync(calc.entries, existingReports);
+
+    if (plan.toDelete.length === 0 && plan.toAdd.length === 0) {
+      return counts;
+    }
+
+    for (const oldEntry of plan.toDelete) {
+      try {
+        await this.ttClient.deleteTime(oldEntry.id);
+        console.log(`  ✓ Deleted ${oldEntry.project}/${oldEntry.task} (${oldEntry.duration}h) for ${calc.date}`);
+        counts.deleted++;
+      } catch (error: any) {
+        console.error(`  ✗ Failed to delete entry ${oldEntry.id} for ${calc.date}: ${error.message}`);
+        counts.errors++;
+      }
+    }
+
+    for (const entry of plan.toAdd) {
+      try {
+        await this.ttClient.addTime(entry);
+        console.log(`✓ Added ${entry.type} entry for ${calc.date} (${entry.duration}h)`);
+        counts.added++;
+      } catch (error: any) {
+        console.error(`✗ Failed to add entry for ${calc.date}: ${error.message}`);
+        counts.errors++;
+      }
+    }
+
+    return counts;
   }
 
   private async ensureClientsConfigLoaded(): Promise<void> {
@@ -95,83 +156,25 @@ export class SyncEngine {
       this.clientsConfig
     );
 
-    // Filter to only workdays with entries
-    const daysWithEntries = calculations.filter((calc) => calc.entries.length > 0);
-    console.log(`✓ ${daysWithEntries.length} days need time entries`);
+    console.log(`✓ ${calculations.filter((c) => c.entries.length > 0).length} days need time entries`);
 
-    // Fetch existing time entries
-    console.log('\nChecking for existing time entries...');
-    const existingReports: ExistingReport[] = [];
-    for (const calc of daysWithEntries) {
-      try {
-        const reports = await this.ttClient.getReports(calc.date);
-        if (reports.reports && reports.reports.length > 0) {
-          existingReports.push(...reports.reports.map((r: any) => ({
-            id: r.id,
-            project: r.project,
-            task: r.task,
-            date: calc.date,
-            duration: parseFloat(r.duration),
-            note: r.note,
-          })));
-        }
-      } catch (error) {
-        console.error(`Warning: Could not fetch reports for ${calc.date}`);
-      }
-    }
-    console.log(`✓ Found ${existingReports.length} existing time entries`);
-
-    // Handle conflicts
-    console.log('\nResolving conflicts...');
-    const resolutions = await ConflictHandler.handleConflicts(
-      daysWithEntries,
-      existingReports
-    );
-
-    // Submit time entries
-    console.log('\nSubmitting time entries...');
-    let successCount = 0;
-    let skipCount = 0;
+    // Delete-then-add every day in range, idempotently
+    console.log('\nSyncing days...');
+    let deletedCount = 0;
+    let addedCount = 0;
     let errorCount = 0;
 
-    for (const [date, resolution] of resolutions) {
-      if (resolution.action === 'skip') {
-        console.log(`⊘ Skipped ${date}`);
-        skipCount++;
-        continue;
-      }
-
-      // If replacing, delete old entries first
-      if (resolution.action === 'replace' && resolution.entriesToDelete.length > 0) {
-        console.log(`Deleting ${resolution.entriesToDelete.length} existing entries for ${date}...`);
-        for (const oldEntry of resolution.entriesToDelete) {
-          try {
-            await this.ttClient.deleteTime(oldEntry.id);
-            console.log(`  ✓ Deleted ${oldEntry.project}/${oldEntry.task} (${oldEntry.duration}h)`);
-          } catch (error: any) {
-            console.error(`  ✗ Failed to delete entry ${oldEntry.id}: ${error.message}`);
-            errorCount++;
-          }
-        }
-      }
-
-      // Add new entries
-      for (const entry of resolution.entriesToAdd) {
-        try {
-          await this.ttClient.addTime(entry);
-          console.log(`✓ Added ${entry.type} entry for ${date} (${entry.duration}h)`);
-          successCount++;
-        } catch (error: any) {
-          console.error(`✗ Failed to add entry for ${date}: ${error.message}`);
-          errorCount++;
-        }
-      }
+    for (const calc of calculations) {
+      const counts = await this.syncDay(calc);
+      deletedCount += counts.deleted;
+      addedCount += counts.added;
+      errorCount += counts.errors;
     }
 
     // Summary
     console.log('\n=== Sync Summary ===');
-    console.log(`✓ Successful: ${successCount} entries`);
-    console.log(`⊘ Skipped: ${skipCount} days`);
+    console.log(`✓ Deleted: ${deletedCount} entries`);
+    console.log(`✓ Added: ${addedCount} entries`);
     console.log(`✗ Errors: ${errorCount} entries`);
   }
 
@@ -196,64 +199,8 @@ export class SyncEngine {
     // Calculate time entries
     const calculation = DayCalculator.calculateDay(date, workEvents, holidayEvents, this.clientsConfig);
 
-    if (calculation.entries.length === 0) {
-      console.log('No time entries needed for this date');
-      return;
-    }
-
-    // Check for existing entries
-    const existingReports: ExistingReport[] = [];
-    try {
-      const reports = await this.ttClient.getReports(date);
-      if (reports.reports && reports.reports.length > 0) {
-        existingReports.push(...reports.reports.map((r: any) => ({
-          id: r.id,
-          project: r.project,
-          task: r.task,
-          date,
-          duration: parseFloat(r.duration),
-          note: r.note,
-        })));
-      }
-    } catch (error) {
-      console.error(`Warning: Could not fetch existing reports`);
-    }
-
-    // Handle conflicts
-    const resolutions = await ConflictHandler.handleConflicts(
-      [calculation],
-      existingReports
-    );
-
-    // Submit entries
-    const resolution = resolutions.get(date);
-    if (!resolution || resolution.action === 'skip') {
-      console.log('⊘ Skipped');
-      return;
-    }
-
-    // If replacing, delete old entries first
-    if (resolution.action === 'replace' && resolution.entriesToDelete.length > 0) {
-      console.log(`Deleting ${resolution.entriesToDelete.length} existing entries...`);
-      for (const oldEntry of resolution.entriesToDelete) {
-        try {
-          await this.ttClient.deleteTime(oldEntry.id);
-          console.log(`  ✓ Deleted ${oldEntry.project}/${oldEntry.task} (${oldEntry.duration}h)`);
-        } catch (error: any) {
-          console.error(`  ✗ Failed to delete entry ${oldEntry.id}: ${error.message}`);
-        }
-      }
-    }
-
-    // Add new entries
-    for (const entry of resolution.entriesToAdd) {
-      try {
-        await this.ttClient.addTime(entry);
-        console.log(`✓ Added ${entry.type} entry (${entry.duration}h)`);
-      } catch (error: any) {
-        console.error(`✗ Failed: ${error.message}`);
-      }
-    }
+    const counts = await this.syncDay(calculation);
+    console.log(`\n✓ Deleted: ${counts.deleted} entries, Added: ${counts.added} entries, Errors: ${counts.errors}`);
   }
 
   async deleteMonth(yearMonth: string): Promise<void> {
