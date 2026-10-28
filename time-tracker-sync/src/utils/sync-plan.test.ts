@@ -46,16 +46,63 @@ describe('planDaySync', () => {
   });
 
   it('deletes and re-adds even when the calculated entries are identical to what already exists', () => {
+    const calculatedClientEntry: TimeEntry = {
+      date: '2026-08-06',
+      project: '1003',
+      task: '5',
+      duration: '9',
+      note: 'Development work',
+      type: 'client',
+    };
     const identicalExisting: ExistingReport = {
       id: 42,
+      project: '1003',
+      task: '5',
+      date: '2026-08-06',
+      duration: 9,
+      note: 'Development work',
+    };
+    const plan = planDaySync([calculatedClientEntry], [identicalExisting]);
+    expect(plan.toDelete).toEqual([identicalExisting]);
+    expect(plan.toAdd).toEqual([calculatedClientEntry]);
+  });
+
+  describe('when a vacation entry already exists in the Time Tracker', () => {
+    const externallySubmittedVacation: ExistingReport = {
+      id: 99,
       project: '14',
       task: '8',
-      date: '2026-08-06',
+      date: '2026-12-01',
       duration: 9,
       note: 'Vacation/PTO',
     };
-    const plan = planDaySync([calculatedVacationEntry], [identicalExisting]);
-    expect(plan.toDelete).toEqual([identicalExisting]);
-    expect(plan.toAdd).toEqual([calculatedVacationEntry]);
+
+    it('leaves it untouched and adds nothing, even when the calculator produced entries', () => {
+      const clientEntry: TimeEntry = {
+        date: '2026-12-01',
+        project: '1003',
+        task: '5',
+        duration: '9',
+        note: 'Development work',
+        type: 'client',
+      };
+      const plan = planDaySync([clientEntry], [externallySubmittedVacation]);
+      expect(plan.toDelete).toEqual([]);
+      expect(plan.toAdd).toEqual([]);
+    });
+
+    it('does not delete other existing entries on that date either', () => {
+      const otherExisting: ExistingReport = {
+        id: 100,
+        project: '1003',
+        task: '5',
+        date: '2026-12-01',
+        duration: 2,
+        note: 'Some other entry',
+      };
+      const plan = planDaySync([], [externallySubmittedVacation, otherExisting]);
+      expect(plan.toDelete).toEqual([]);
+      expect(plan.toAdd).toEqual([]);
+    });
   });
 });
