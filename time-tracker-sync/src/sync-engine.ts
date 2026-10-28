@@ -172,10 +172,19 @@ export class SyncEngine {
     }
 
     // Summary
+    const vacationDays = calculations.filter((c) => c.hasVacation).length;
+    const holidayDays = calculations.filter((c) => c.isHoliday).length;
+    const clientHours = calculations.reduce((sum, c) => sum + c.clientHours, 0);
+    const tikalHours = calculations.reduce((sum, c) => sum + c.meetingHours, 0);
+
     console.log('\n=== Sync Summary ===');
     console.log(`✓ Deleted: ${deletedCount} entries`);
     console.log(`✓ Added: ${addedCount} entries`);
     console.log(`✗ Errors: ${errorCount} entries`);
+    console.log(`\nVacation days: ${vacationDays}`);
+    console.log(`Holidays: ${holidayDays}`);
+    console.log(`Hours at client: ${clientHours}`);
+    console.log(`Hours at Tikal: ${tikalHours}`);
   }
 
   async syncDate(date: string): Promise<void> {
