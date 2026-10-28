@@ -1,5 +1,4 @@
 import type { TimeEntry, ExistingReport } from '../types.js';
-import { TASK_VACATION } from '../types.js';
 
 export interface DaySyncPlan {
   toDelete: ExistingReport[];
@@ -15,9 +14,17 @@ export interface DaySyncPlan {
  * day, it was submitted by the external vacation-request auto-approval
  * system, not by this sync. Leave the day untouched entirely - no deletes,
  * no adds - rather than overwrite or layer on top of it.
+ *
+ * `vacationTaskName` must be the task's display *name* (e.g. "Vacation"),
+ * not its id - the Time Tracker API returns existing reports' task field as
+ * a name, not the id used when adding entries.
  */
-export function planDaySync(calculatedEntries: TimeEntry[], existingReports: ExistingReport[]): DaySyncPlan {
-  const alreadyHasVacation = existingReports.some((report) => report.task === TASK_VACATION);
+export function planDaySync(
+  calculatedEntries: TimeEntry[],
+  existingReports: ExistingReport[],
+  vacationTaskName: string
+): DaySyncPlan {
+  const alreadyHasVacation = existingReports.some((report) => report.task === vacationTaskName);
   if (alreadyHasVacation) {
     return { toDelete: [], toAdd: [] };
   }

@@ -16,9 +16,15 @@ export class EventClassifier {
   }
 
   /**
-   * Check if an event is a vacation/PTO event
+   * Check if an event is a vacation/PTO event. Covers both calendar invites
+   * with a vacation keyword in the summary, and native Google Calendar
+   * Out-of-Office events (which the vacation-request auto-approval system
+   * creates with summary "OOO" and no keyword match).
    */
   static isVacationEvent(event: CalendarEvent): boolean {
+    if (event.eventType === 'outOfOffice') {
+      return true;
+    }
     const summary = event.summary?.toLowerCase() || '';
     return summary.includes('vacation') || summary.includes('pto') || summary.includes('paid time off');
   }

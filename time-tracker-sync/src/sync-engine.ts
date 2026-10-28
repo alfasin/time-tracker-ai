@@ -7,6 +7,7 @@ import { planDaySync } from './utils/sync-plan.js';
 import { ensureClientsConfig } from './utils/client-reconciler.js';
 import type { ClientsConfig } from './utils/client-config.js';
 import type { SyncConfig, ExistingReport, DayCalculation } from './types.js';
+import { TASK_VACATION } from './types.js';
 
 interface DaySyncCounts {
   deleted: number;
@@ -19,6 +20,7 @@ export class SyncEngine {
   private calClient: CalendarClient;
   private config: SyncConfig;
   private clientsConfig!: ClientsConfig;
+  private vacationTaskName!: string;
 
   constructor(config: SyncConfig) {
     this.config = config;
@@ -73,7 +75,7 @@ export class SyncEngine {
       console.error(`Warning: Could not fetch reports for ${calc.date}`);
     }
 
-    const plan = planDaySync(calc.entries, existingReports);
+    const plan = planDaySync(calc.entries, existingReports, this.vacationTaskName);
 
     if (plan.toDelete.length === 0 && plan.toAdd.length === 0) {
       return counts;
@@ -113,6 +115,15 @@ export class SyncEngine {
       projects
     );
     console.log(`✓ Client billing mode: ${this.clientsConfig.mode}`);
+
+    // Existing Time Tracker reports expose the task as a display name, not
+    // the id used when adding entries - resolve it live so the "already has
+    // vacation" check in planDaySync compares against the right value.
+    const vacationTask = projects.flatMap((p) => p.tasks).find((t) => t.id === TASK_VACATION);
+    if (!vacationTask) {
+      throw new Error(`Could not resolve name for vacation task id ${TASK_VACATION} from Time Tracker projects`);
+    }
+    this.vacationTaskName = vacationTask.name;
   }
 
   async syncMonth(yearMonth?: string): Promise<void> {
